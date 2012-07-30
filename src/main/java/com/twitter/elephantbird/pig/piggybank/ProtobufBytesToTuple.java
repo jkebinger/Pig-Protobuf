@@ -1,10 +1,14 @@
 package com.twitter.elephantbird.pig.piggybank;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.pig.EvalFunc;
 import org.apache.pig.data.DataByteArray;
+import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.data.TupleFactory;
 import org.apache.pig.impl.logicalLayer.schema.Schema;
 
 import com.google.protobuf.Message;
@@ -52,9 +56,24 @@ public class ProtobufBytesToTuple<M extends Message> extends EvalFunc<Tuple> {
   public Tuple exec(Tuple input) throws IOException {
     if (input == null || input.size() < 1) return null;
     try {
-      DataByteArray bytes = (DataByteArray) input.get(0);
-      M value_ = protoConverter_.fromBytes(bytes.get());
-      return new ProtobufTuple(value_);
+    	byte type  = input.getType(0);
+    	if (type == DataType.BYTEARRAY) {
+    		DataByteArray bytes = (DataByteArray) input.get(0);
+      	M value_ = protoConverter_.fromBytes(bytes.get());
+      	return new ProtobufTuple(value_);
+    	}
+    	else if (type == DataType.MAP) {
+    		Map map = (HashMap) input.get(0);
+    		Map output = new HashMap(map.size());
+    		for (Object key: map.keySet()) {
+    			DataByteArray bytes = (DataByteArray) map.get(key);
+    			M value_ = protoConverter_.fromBytes(bytes.get());
+    			output.put(key, new ProtobufTuple(value_));
+    		}
+    		return TupleFactory.getInstance().newTuple(output);
+    	}
+    	return null;
+      
     } catch (IOException e) {
       return null;
     }
